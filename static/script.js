@@ -161,12 +161,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             
             if (data.success) {
+                // Store the original plan text for copying
+                const originalPlanText = data.plan;
+                
                 // Display results
-                planContent.textContent = data.plan;
                 resultContainer.style.display = 'block';
                 
                 // Convert markdown format to HTML (simple processing)
                 planContent.innerHTML = formatPlan(data.plan);
+                
+                // Store original text in a data attribute for copying
+                planContent.setAttribute('data-original-text', originalPlanText);
                 
                 // Plan generation doesn't use search, so no reference links
                 
@@ -338,21 +343,88 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Copy functionality
-    copyBtn.addEventListener('click', function() {
-        const text = planContent.textContent || planContent.innerText;
-        navigator.clipboard.writeText(text).then(function() {
-            const originalText = copyBtn.textContent;
-            copyBtn.textContent = 'Copied!';
-            copyBtn.style.background = '#28a745';
-            setTimeout(function() {
-                copyBtn.textContent = originalText;
-                copyBtn.style.background = '#495057';
-            }, 2000);
-        }).catch(function(err) {
-            console.error('Copy failed:', err);
-            alert('Copy failed, please manually select and copy the text');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', function() {
+            // Get text content - try multiple methods to ensure we get the text
+            let text = '';
+            
+            // First try: get original text from data attribute (most reliable)
+            if (planContent.getAttribute('data-original-text')) {
+                text = planContent.getAttribute('data-original-text');
+            }
+            // Second try: get text from the element directly
+            else if (planContent.textContent) {
+                text = planContent.textContent;
+            } else if (planContent.innerText) {
+                text = planContent.innerText;
+            } else {
+                // Fallback: create a temporary element to extract text
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = planContent.innerHTML;
+                text = tempDiv.textContent || tempDiv.innerText || '';
+            }
+            
+            // Remove extra whitespace but preserve line breaks
+            text = text.trim();
+            
+            if (!text) {
+                alert('No content to copy. Please generate a travel plan first.');
+                return;
+            }
+            
+            // Use Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = 'Copied!';
+                    copyBtn.style.background = '#28a745';
+                    setTimeout(function() {
+                        copyBtn.textContent = originalText;
+                        copyBtn.style.background = '#1D4C50';
+                    }, 2000);
+                }).catch(function(err) {
+                    console.error('Copy failed:', err);
+                    // Fallback: use execCommand
+                    fallbackCopyTextToClipboard(text);
+                });
+            } else {
+                // Fallback for browsers that don't support Clipboard API
+                fallbackCopyTextToClipboard(text);
+            }
         });
-    });
+    }
+    
+    // Fallback copy function for older browsers
+    function fallbackCopyTextToClipboard(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = 'Copied!';
+                copyBtn.style.background = '#28a745';
+                setTimeout(function() {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.background = '#1D4C50';
+                }, 2000);
+            } else {
+                alert('Copy failed. Please manually select and copy the text.');
+            }
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+            alert('Copy failed. Please manually select and copy the text.');
+        } finally {
+            document.body.removeChild(textArea);
+        }
+    }
 
     function showError(message) {
         errorContainer.style.display = 'block';

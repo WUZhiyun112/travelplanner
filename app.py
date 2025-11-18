@@ -120,10 +120,29 @@ def extract_webpage_content(url, max_length=2000):
     返回网页的文本内容
     """
     try:
+        # 使用更现代的 User-Agent 和更多请求头来避免被阻止
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none'
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        
+        response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+        
+        # 检查状态码
+        if response.status_code == 403:
+            logger.warning(f"网页访问被阻止 (403): {url} - 可能是反爬虫机制")
+            return None
+        elif response.status_code == 404:
+            logger.warning(f"网页不存在 (404): {url}")
+            return None
+        
         response.raise_for_status()
         response.encoding = response.apparent_encoding or 'utf-8'
         
@@ -158,6 +177,15 @@ def extract_webpage_content(url, max_length=2000):
             text = text[:max_length] + '...'
         
         return text
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 403:
+            logger.warning(f"网页访问被阻止 (403): {url} - 可能是反爬虫机制")
+        else:
+            logger.warning(f"HTTP错误 {e.response.status_code} 提取网页内容失败 {url}: {str(e)}")
+        return None
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"网络错误提取网页内容失败 {url}: {str(e)}")
+        return None
     except Exception as e:
         logger.warning(f"提取网页内容失败 {url}: {str(e)}")
         return None
@@ -284,6 +312,7 @@ def search():
         print(f"开始提取 {min(len(search_results), 3)} 个网页的内容...")
         enriched_results = []
         max_extract = min(len(search_results), 3)  # 最多提取3个，避免超时
+        successful_extracts = 0
         for i, result in enumerate(search_results[:max_extract], 1):
             try:
                 logger.info(f"正在提取网页 {i}/{max_extract}: {result['link']}")
@@ -291,17 +320,19 @@ def search():
                 content = extract_webpage_content(result['link'], max_length=1000)  # 减少内容长度
                 if content:
                     result['content'] = content
-                    enriched_results.append(result)
+                    successful_extracts += 1
+                    logger.info(f"成功提取网页 {i} 的内容，长度: {len(content)} 字符")
                 else:
                     # 即使提取失败，也保留搜索结果（至少有用摘要）
-                    enriched_results.append(result)
+                    logger.info(f"网页 {i} 提取失败，将使用搜索结果摘要")
+                enriched_results.append(result)
             except Exception as extract_error:
                 logger.warning(f"提取网页 {i} 失败: {str(extract_error)}")
-                # 继续处理下一个
+                # 继续处理下一个，保留搜索结果
                 enriched_results.append(result)
         
-        logger.info(f"成功提取 {len(enriched_results)} 个网页的内容")
-        print(f"成功提取 {len(enriched_results)} 个网页的内容")
+        logger.info(f"成功提取 {successful_extracts}/{max_extract} 个网页的内容，共 {len(enriched_results)} 个结果")
+        print(f"成功提取 {successful_extracts}/{max_extract} 个网页的内容，共 {len(enriched_results)} 个结果")
         
         # 构建AI总结提示词（英文）
         summary_prompt = f"Please summarize the following search results about '{query}', extract key information and organize it into a clear summary:\n\n"
@@ -442,11 +473,11 @@ def generate_plan():
         if preferences:
             prompt += f"Preferences: {preferences}\n\n"
         
-        prompt += """Please provide a detailed travel plan in the following format:
+        prompt += f"""Please provide a detailed travel plan in the following format. IMPORTANT: You must create a complete itinerary for ALL {days} days. Do not stop early.
 
 ## Travel Plan Overview
 - Destination: [Destination name]
-- Travel Days: [Number of days]
+- Travel Days: {days} days (MUST include all {days} days)
 - Recommended Season: [Best travel time]
 
 ## Daily Itinerary
@@ -473,13 +504,15 @@ def generate_plan():
 ### Day 2: [Date/Theme]
 [Continue in the same format...]
 
+[Continue for ALL {days} days - Day 3, Day 4, Day 5, ... Day {days}]
+
 ## Practical Information
 - **Local Transportation:** [Transportation suggestions]
 - **Food Recommendations:** [Local specialties and restaurants]
 - **Important Notes:** [Important tips]
 - **Budget Estimate:** [Daily/Total budget suggestions]
 
-Please ensure the plan is reasonable, detailed, and includes specific attractions, restaurants, and activity recommendations. Write everything in English."""
+CRITICAL REQUIREMENT: You MUST provide a complete itinerary for all {days} days. Do not stop at Day 14 or any other day before Day {days}. Include Day 1 through Day {days} in your response. Write everything in English."""
 
         # 调用DeepSeek API
         logger.info("正在调用DeepSeek API...")
@@ -500,14 +533,22 @@ Please ensure the plan is reasonable, detailed, and includes specific attraction
                     }
                 ],
                 temperature=0.7,
-                max_tokens=2000,
-                timeout=60  # 设置60秒超时
+                max_tokens=4000,  # Increased to support longer itineraries (20+ days)
+                timeout=120  # Increased timeout for longer responses
             )
             
             if not response or not response.choices:
                 raise Exception("API返回数据格式错误")
             
             plan = response.choices[0].message.content
+            
+            # Check if response was truncated due to token limit
+            finish_reason = response.choices[0].finish_reason if hasattr(response.choices[0], 'finish_reason') else None
+            if finish_reason == 'length':
+                logger.warning(f"API response was truncated due to token limit. Requested {days} days.")
+                print(f"警告: API响应因token限制被截断。请求了{days}天。")
+                plan += f"\n\n[Note: The response was truncated due to token limit. The itinerary may be incomplete. For longer trips ({days} days), please consider splitting into multiple requests or reducing the detail level.]"
+            
             logger.info("API调用成功，返回计划")
             print("API调用成功，返回计划")  # 调试日志
             
