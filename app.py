@@ -1,13 +1,15 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_file
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
 import requests
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import re
+from ics import Calendar, Event
+from io import BytesIO
 
 # 加载环境变量
 try:
@@ -37,19 +39,32 @@ logger.info("=" * 50)
 logger.info("应用启动")
 logger.info("=" * 50)
 
-# 初始化DeepSeek客户端（兼容OpenAI SDK）
+# LLM模式配置：'cloud' 或 'local'
+LLM_MODE = os.getenv('LLM_MODE', 'cloud').lower()  # 默认使用云端
+
+# 初始化DeepSeek客户端（兼容OpenAI SDK）- 仅云端模式使用
 client = OpenAI(
     api_key=os.getenv('DEEPSEEK_API_KEY', 'sk-9ed593627cf943108c5ebc6541459ad9'),
     base_url="https://api.deepseek.com"
 )
+
+# 本地LLM配置（Ollama）
+OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2')  # 默认模型
 
 # Google Custom Search API 配置
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBwyTp6pR1Xwj_Z5_V0YkY_Q4AY53-bzMc')
 GOOGLE_SEARCH_ENGINE_ID = os.getenv('GOOGLE_SEARCH_ENGINE_ID', '5299e07176b844ae6')
 
 # 启动时打印配置信息
+logger.info(f"LLM模式: {LLM_MODE}")
 logger.info(f"Google API配置: API_KEY={GOOGLE_API_KEY[:10]}..., SEARCH_ENGINE_ID={GOOGLE_SEARCH_ENGINE_ID}")
+if LLM_MODE == 'local':
+    logger.info(f"本地LLM配置: URL={OLLAMA_BASE_URL}, MODEL={OLLAMA_MODEL}")
+print(f"LLM模式: {LLM_MODE}")
 print(f"Google API配置: API_KEY={GOOGLE_API_KEY[:10]}..., SEARCH_ENGINE_ID={GOOGLE_SEARCH_ENGINE_ID}")
+if LLM_MODE == 'local':
+    print(f"本地LLM配置: URL={OLLAMA_BASE_URL}, MODEL={OLLAMA_MODEL}")
 
 def google_search(query, num_results=5):
     """
@@ -243,6 +258,165 @@ def search_destination_info(destination, days, preferences=''):
     logger.info(f"成功提取 {len(enriched_results)} 个网页的内容")
     print(f"成功提取 {len(enriched_results)} 个网页的内容")
     return enriched_results
+
+def check_ollama_connection():
+    """
+    检查Ollama连接和模型是否可用
+    """
+    try:
+        # 检查Ollama服务是否运行
+        health_url = f"{OLLAMA_BASE_URL}/api/tags"
+        response = requests.get(health_url, timeout=5)
+        response.raise_for_status()
+        
+        # 检查模型是否存在
+        models_data = response.json()
+        available_models = [model.get('name', '').split(':')[0] for model in models_data.get('models', [])]
+        
+        # 检查请求的模型是否可用（支持带版本号和不带版本号）
+        model_base = OLLAMA_MODEL.split(':')[0]
+        if model_base not in available_models and OLLAMA_MODEL not in [m.get('name', '') for m in models_data.get('models', [])]:
+            available_models_str = ', '.join(available_models) if available_models else 'None'
+            raise Exception(f"模型 '{OLLAMA_MODEL}' 未安装。已安装的模型: {available_models_str}。请运行: ollama pull {OLLAMA_MODEL}")
+        
+        return True
+    except requests.exceptions.ConnectionError:
+        raise Exception(f"无法连接到Ollama服务 ({OLLAMA_BASE_URL})。请确保Ollama正在运行。启动方法: 运行 'ollama serve' 或启动Ollama应用程序。")
+    except requests.exceptions.Timeout:
+        raise Exception(f"连接Ollama服务超时 ({OLLAMA_BASE_URL})。请检查Ollama是否正常运行。")
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"检查Ollama连接时出错: {str(e)}。请确保Ollama正在运行。")
+
+def call_local_llm(prompt, system_prompt="You are a helpful assistant."):
+    """
+    调用本地LLM (Ollama)
+    """
+    try:
+        # 首先检查连接和模型
+        logger.info(f"检查Ollama连接和模型: {OLLAMA_MODEL}")
+        check_ollama_connection()
+        
+        logger.info(f"调用本地LLM: {OLLAMA_MODEL}")
+        url = f"{OLLAMA_BASE_URL}/api/chat"
+        payload = {
+            "model": OLLAMA_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            "options": {
+                "temperature": 0.5,  # 降低temperature加快速度
+                "num_predict": 2000,  # 限制最大输出token数，加快速度
+                "top_p": 0.9,  # 优化采样参数
+            },
+            "stream": False
+        }
+        logger.info(f"发送请求到: {url}")
+        response = requests.post(url, json=payload, timeout=300)  # 5分钟超时
+        
+        if response.status_code == 404:
+            raise Exception(f"API端点不存在 (404)。请检查Ollama版本。尝试访问: {OLLAMA_BASE_URL}/api/tags 查看是否可访问。")
+        
+        response.raise_for_status()
+        result = response.json()
+        
+        if 'message' not in result or 'content' not in result.get('message', {}):
+            logger.error(f"Ollama返回格式异常: {result}")
+            raise Exception("Ollama返回的数据格式不正确")
+        
+        content = result.get('message', {}).get('content', '')
+        if not content:
+            raise Exception("Ollama返回的内容为空")
+        
+        return content
+    except requests.exceptions.ConnectionError as e:
+        error_msg = f"无法连接到Ollama服务 ({OLLAMA_BASE_URL})。请确保Ollama正在运行。\n解决方法:\n1. 启动Ollama: 运行 'ollama serve' 或启动Ollama应用程序\n2. 检查URL是否正确: {OLLAMA_BASE_URL}\n3. 检查防火墙设置"
+        logger.error(f"本地LLM连接失败: {error_msg}")
+        raise Exception(error_msg)
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            error_msg = f"模型 '{OLLAMA_MODEL}' 未找到 (404)。请运行: ollama pull {OLLAMA_MODEL}"
+            logger.error(f"本地LLM调用失败: {error_msg}")
+            raise Exception(error_msg)
+        else:
+            error_msg = f"HTTP错误 ({e.response.status_code}): {str(e)}"
+            logger.error(f"本地LLM调用失败: {error_msg}")
+            raise Exception(error_msg)
+    except requests.exceptions.Timeout:
+        error_msg = "请求超时（超过5分钟）。模型可能正在处理，请稍后重试或使用更小的提示词。"
+        logger.error(f"本地LLM调用超时: {error_msg}")
+        raise Exception(error_msg)
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"本地LLM调用失败: {error_msg}")
+        raise Exception(f"本地LLM调用失败: {error_msg}")
+
+def parse_plan_to_ics(plan_text, destination, start_date=None):
+    """
+    解析行程文本并生成.ics日历文件
+    """
+    try:
+        # 如果没有指定开始日期，使用明天
+        if not start_date:
+            start_date = datetime.now() + timedelta(days=1)
+        else:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+        
+        # 创建日历
+        calendar = Calendar()
+        
+        # 解析每日行程
+        lines = plan_text.split('\n')
+        current_day = None
+        current_events = []
+        
+        for line in lines:
+            line = line.strip()
+            # 匹配 "Day X:" 或 "### Day X:"
+            day_match = re.search(r'Day\s+(\d+):', line, re.IGNORECASE)
+            if day_match:
+                # 保存之前一天的事件
+                if current_day is not None and current_events:
+                    day_date = start_date + timedelta(days=current_day - 1)
+                    event_text = '\n'.join(current_events)
+                    event = Event()
+                    event.name = f"Day {current_day}: {destination}"
+                    event.begin = day_date.replace(hour=9, minute=0)  # 默认早上9点
+                    event.end = day_date.replace(hour=18, minute=0)  # 默认晚上6点
+                    event.description = event_text[:1000]  # 限制描述长度
+                    calendar.events.add(event)
+                
+                current_day = int(day_match.group(1))
+                current_events = []
+            elif current_day and line and not line.startswith('#'):
+                # 收集当天的活动信息
+                if line.startswith('**') or line.startswith('-') or line.startswith('*'):
+                    current_events.append(line)
+        
+        # 保存最后一天的事件
+        if current_day is not None and current_events:
+            day_date = start_date + timedelta(days=current_day - 1)
+            event_text = '\n'.join(current_events)
+            event = Event()
+            event.name = f"Day {current_day}: {destination}"
+            event.begin = day_date.replace(hour=9, minute=0)
+            event.end = day_date.replace(hour=18, minute=0)
+            event.description = event_text[:1000]
+            calendar.events.add(event)
+        
+        # 如果没有解析到任何事件，创建一个默认事件
+        if len(calendar.events) == 0:
+            event = Event()
+            event.name = f"Travel Plan: {destination}"
+            event.begin = start_date.replace(hour=9, minute=0)
+            event.end = start_date.replace(hour=18, minute=0)
+            event.description = plan_text[:1000]
+            calendar.events.add(event)
+        
+        return calendar
+    except Exception as e:
+        logger.error(f"解析行程到ICS失败: {str(e)}")
+        raise
 
 @app.route('/')
 def index():
@@ -452,6 +626,7 @@ def generate_plan():
         destination = data.get('destination', '')
         budget = data.get('budget', '')
         preferences = data.get('preferences', '')
+        llm_mode = data.get('llm_mode', LLM_MODE).lower()  # 允许前端指定模式
         
         # 验证必填字段
         if not days or not destination:
@@ -460,9 +635,13 @@ def generate_plan():
                 'error': '请填写旅游天数和目的地'
             }), 400
         
-        # 直接使用DeepSeek API生成计划，不进行搜索
-        logger.info(f"使用DeepSeek API生成 {days}天 {destination} 的旅游计划")
-        print(f"使用DeepSeek API生成 {days}天 {destination} 的旅游计划")
+        # 根据模式选择LLM
+        if llm_mode == 'local':
+            logger.info(f"使用本地LLM生成 {days}天 {destination} 的旅游计划")
+            print(f"使用本地LLM生成 {days}天 {destination} 的旅游计划")
+        else:
+            logger.info(f"使用云端DeepSeek API生成 {days}天 {destination} 的旅游计划")
+            print(f"使用云端DeepSeek API生成 {days}天 {destination} 的旅游计划")
         
         # 构建提示词（不包含搜索结果，使用英文）
         prompt = f"""Please create a detailed {days}-day travel plan for {destination}.
@@ -473,7 +652,29 @@ def generate_plan():
         if preferences:
             prompt += f"Preferences: {preferences}\n\n"
         
-        prompt += f"""Please provide a detailed travel plan in the following format. IMPORTANT: You must create a complete itinerary for ALL {days} days. Do not stop early.
+        # 根据模式优化提示词长度（本地LLM需要更简洁的提示）
+        if llm_mode == 'local':
+            # 本地LLM使用极简提示词以加快生成速度
+            prompt += f"""Create a {days}-day travel plan for {destination}.
+
+Format:
+Day 1:
+- Morning: [activities]
+- Afternoon: [activities]
+- Evening: [dining]
+- Stay: [accommodation]
+
+[Repeat for all {days} days]
+
+Tips: [transport, food, budget]
+
+IMPORTANT: 
+- Write in English. Include all {days} days.
+- Do NOT ask any questions. Do NOT request additional information.
+- Provide a complete plan directly without any follow-up questions."""
+        else:
+            # 云端LLM可以使用更详细的提示词
+            prompt += f"""Please provide a detailed travel plan in the following format. IMPORTANT: You must create a complete itinerary for ALL {days} days. Do not stop early.
 
 ## Travel Plan Overview
 - Destination: [Destination name]
@@ -512,45 +713,60 @@ def generate_plan():
 - **Important Notes:** [Important tips]
 - **Budget Estimate:** [Daily/Total budget suggestions]
 
-CRITICAL REQUIREMENT: You MUST provide a complete itinerary for all {days} days. Do not stop at Day 14 or any other day before Day {days}. Include Day 1 through Day {days} in your response. Write everything in English."""
+CRITICAL REQUIREMENT: 
+- You MUST provide a complete itinerary for all {days} days. Do not stop at Day 14 or any other day before Day {days}. Include Day 1 through Day {days} in your response.
+- Do NOT ask any questions. Do NOT request additional information from the user.
+- Provide the complete travel plan directly without any follow-up questions or requests for clarification.
+- Write everything in English."""
 
-        # 调用DeepSeek API
-        logger.info("正在调用DeepSeek API...")
-        logger.info(f"API密钥: {client.api_key[:10]}...")  # 只显示前10个字符
-        print("正在调用DeepSeek API...")  # 调试日志
-        print(f"API密钥: {client.api_key[:10]}...")  # 只显示前10个字符
+        # 根据模式调用不同的LLM
         try:
-            response = client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a professional travel planner, skilled at creating detailed and practical travel plans. Your responses should be well-structured, accurate, and provide reasonable suggestions. Always respond in English."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=4000,  # Increased to support longer itineraries (20+ days)
-                timeout=120  # Increased timeout for longer responses
-            )
-            
-            if not response or not response.choices:
-                raise Exception("API返回数据格式错误")
-            
-            plan = response.choices[0].message.content
-            
-            # Check if response was truncated due to token limit
-            finish_reason = response.choices[0].finish_reason if hasattr(response.choices[0], 'finish_reason') else None
-            if finish_reason == 'length':
-                logger.warning(f"API response was truncated due to token limit. Requested {days} days.")
-                print(f"警告: API响应因token限制被截断。请求了{days}天。")
-                plan += f"\n\n[Note: The response was truncated due to token limit. The itinerary may be incomplete. For longer trips ({days} days), please consider splitting into multiple requests or reducing the detail level.]"
-            
-            logger.info("API调用成功，返回计划")
-            print("API调用成功，返回计划")  # 调试日志
+            if llm_mode == 'local':
+                # 调用本地LLM
+                logger.info("正在调用本地LLM...")
+                print("正在调用本地LLM...")
+                # 本地LLM使用更简洁的system prompt
+                system_prompt = "You are a travel planner. Create concise, practical travel plans in English. Never ask questions - always provide complete plans directly."
+                plan = call_local_llm(prompt, system_prompt)
+                logger.info("本地LLM调用成功，返回计划")
+                print("本地LLM调用成功，返回计划")
+            else:
+                # 调用云端DeepSeek API
+                logger.info("正在调用DeepSeek API...")
+                logger.info(f"API密钥: {client.api_key[:10]}...")  # 只显示前10个字符
+                print("正在调用DeepSeek API...")  # 调试日志
+                print(f"API密钥: {client.api_key[:10]}...")  # 只显示前10个字符
+                response = client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a professional travel planner, skilled at creating detailed and practical travel plans. Your responses should be well-structured, accurate, and provide reasonable suggestions. Always respond in English."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    temperature=0.7,
+                    max_tokens=4000,  # Increased to support longer itineraries (20+ days)
+                    timeout=120  # Increased timeout for longer responses
+                )
+                
+                if not response or not response.choices:
+                    raise Exception("API返回数据格式错误")
+                
+                plan = response.choices[0].message.content
+                
+                # Check if response was truncated due to token limit
+                finish_reason = response.choices[0].finish_reason if hasattr(response.choices[0], 'finish_reason') else None
+                if finish_reason == 'length':
+                    logger.warning(f"API response was truncated due to token limit. Requested {days} days.")
+                    print(f"警告: API响应因token限制被截断。请求了{days}天。")
+                    plan += f"\n\n[Note: The response was truncated due to token limit. The itinerary may be incomplete. For longer trips ({days} days), please consider splitting into multiple requests or reducing the detail level.]"
+                
+                logger.info("API调用成功，返回计划")
+                print("API调用成功，返回计划")  # 调试日志
             
             return jsonify({
                 'success': True,
@@ -598,6 +814,58 @@ CRITICAL REQUIREMENT: You MUST provide a complete itinerary for all {days} days.
             'success': False,
             'error': f'生成计划时出错：{error_message}',
             'detail': str(e) if app.debug else None
+        }), 500
+
+@app.route('/api/export-ics', methods=['POST'])
+def export_ics():
+    """导出行程为.ics日历文件"""
+    try:
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'error': '请求格式错误，需要JSON格式'
+            }), 400
+        
+        data = request.json
+        plan_text = data.get('plan', '')
+        destination = data.get('destination', 'Travel Plan')
+        start_date = data.get('start_date', None)  # 格式: 'YYYY-MM-DD'
+        
+        if not plan_text:
+            return jsonify({
+                'success': False,
+                'error': '行程内容为空'
+            }), 400
+        
+        # 解析并生成ICS文件
+        calendar = parse_plan_to_ics(plan_text, destination, start_date)
+        
+        # 生成ICS文件内容
+        ics_content = str(calendar)
+        
+        # 创建文件对象
+        ics_file = BytesIO()
+        ics_file.write(ics_content.encode('utf-8'))
+        ics_file.seek(0)
+        
+        # 生成文件名
+        filename = f"travel_plan_{destination.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.ics"
+        
+        logger.info(f"成功生成ICS文件: {filename}")
+        return send_file(
+            ics_file,
+            mimetype='text/calendar',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        logger.error(f"导出ICS文件错误: {error_detail}")
+        return jsonify({
+            'success': False,
+            'error': f'导出ICS文件时出错：{str(e)}'
         }), 500
 
 if __name__ == '__main__':

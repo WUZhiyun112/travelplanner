@@ -121,21 +121,29 @@ document.addEventListener('DOMContentLoaded', function() {
             days: document.getElementById('days').value,
             destination: document.getElementById('destination').value,
             budget: budget,
-            preferences: document.getElementById('preferences').value
+            preferences: document.getElementById('preferences').value,
+            llm_mode: document.getElementById('llmMode').value
         };
         
         // Show loading state
         generateBtn.disabled = true;
         btnText.style.display = 'none';
         btnLoader.style.display = 'inline';
-        btnLoader.textContent = 'Generating your travel plan, please wait...';
+        const isLocalMode = formData.llm_mode === 'local';
+        if (isLocalMode) {
+            btnLoader.textContent = 'Generating with local LLM (this may take 3-10 minutes, please be patient)...';
+        } else {
+            btnLoader.textContent = 'Generating your travel plan, please wait...';
+        }
         
         try {
             debugLog('Preparing to send generate plan request', formData);
             
-            // Set timeout (120 seconds)
+            // Set timeout (10 minutes for local LLM, 2 minutes for cloud)
+            const isLocalMode = formData.llm_mode === 'local';
+            const timeoutDuration = isLocalMode ? 600000 : 120000; // 10 minutes for local, 2 minutes for cloud
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 120000);
+            const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
             
             debugLog('Sending request to /api/generate-plan...');
             const response = await fetch('/api/generate-plan', {
@@ -161,8 +169,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             
             if (data.success) {
-                // Store the original plan text for copying
+                // Store the original plan text for copying and exporting
                 const originalPlanText = data.plan;
+                const destination = document.getElementById('destination').value;
                 
                 // Display results
                 resultContainer.style.display = 'block';
@@ -170,8 +179,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Convert markdown format to HTML (simple processing)
                 planContent.innerHTML = formatPlan(data.plan);
                 
-                // Store original text in a data attribute for copying
+                // Store original text and destination in data attributes
                 planContent.setAttribute('data-original-text', originalPlanText);
+                planContent.setAttribute('data-destination', destination);
+                
+                // Show export options
+                const exportOptions = document.getElementById('exportOptions');
+                if (exportOptions) {
+                    exportOptions.style.display = 'block';
+                    // Set default start date to tomorrow
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    const startDateInput = document.getElementById('startDate');
+                    if (startDateInput) {
+                        startDateInput.value = tomorrow.toISOString().split('T')[0];
+                    }
+                }
                 
                 // Plan generation doesn't use search, so no reference links
                 
@@ -195,7 +218,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             let errorMsg = 'Error generating plan: ';
             if (error.name === 'AbortError') {
-                errorMsg = 'Request timeout (exceeded 120 seconds). Please try again later.';
+                const timeoutMinutes = formData.llm_mode === 'local' ? 10 : 2;
+                errorMsg = `Request timeout (exceeded ${timeoutMinutes} minutes). Local LLM may need more time. Please try again or use Cloud mode for faster response.`;
             } else if (error.message === 'Failed to fetch') {
                 errorMsg = 'Unable to connect to server. Please check:\n1. Is the server running (run python app.py)\n2. Is the server address correct\n3. Is the network connection normal';
             } else {
@@ -390,6 +414,60 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 // Fallback for browsers that don't support Clipboard API
                 fallbackCopyTextToClipboard(text);
+            }
+        });
+    }
+
+    // Export to ICS functionality
+    const exportIcsBtn = document.getElementById('exportIcsBtn');
+    if (exportIcsBtn) {
+        exportIcsBtn.addEventListener('click', async function() {
+            const planText = planContent.getAttribute('data-original-text');
+            const destination = planContent.getAttribute('data-destination') || 'Travel Plan';
+            const startDateInput = document.getElementById('startDate');
+            const startDate = startDateInput ? startDateInput.value : null;
+            
+            if (!planText) {
+                alert('No travel plan to export. Please generate a travel plan first.');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/export-ics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        plan: planText,
+                        destination: destination,
+                        start_date: startDate
+                    }),
+                    credentials: 'same-origin'
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Failed to export calendar' }));
+                    throw new Error(errorData.error || 'Failed to export calendar');
+                }
+                
+                // Get the file blob
+                const blob = await response.blob();
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `travel_plan_${destination.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.ics`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                alert('Calendar file exported successfully! You can import it into your calendar application.');
+            } catch (error) {
+                console.error('Export error:', error);
+                alert(`Failed to export calendar: ${error.message}`);
             }
         });
     }

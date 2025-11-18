@@ -311,6 +311,44 @@ main {
     margin-bottom: 20px;
     padding-bottom: 15px;
     border-bottom: 2px solid #3F605B;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.result-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.export-options {
+    margin-bottom: 15px;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #3F605B;
+}
+
+.export-options label {
+    display: block;
+    margin-bottom: 8px;
+    color: #3F605B;
+    font-weight: 500;
+}
+
+.export-options input[type="date"] {
+    padding: 10px;
+    border: 2px solid #3F605B;
+    border-radius: 6px;
+    font-size: 1em;
+    color: #3F605B;
+    font-family: inherit;
+}
+
+.export-options input[type="date"]:focus {
+    outline: none;
+    border-color: #1D4C50;
+    box-shadow: 0 0 0 3px rgba(29, 76, 80, 0.1);
 }
 
 .result-header h2 {
