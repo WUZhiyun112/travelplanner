@@ -301,6 +301,18 @@ main {
     color: #333;
 }
 
+.plan-content a {
+    color: #667eea;
+    text-decoration: none;
+    transition: color 0.3s ease;
+    word-break: break-all;
+}
+
+.plan-content a:hover {
+    text-decoration: underline;
+    color: #764ba2;
+}
+
 .error-container {
     background: #fee;
     border: 2px solid #fcc;

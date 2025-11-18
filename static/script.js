@@ -69,25 +69,34 @@ document.addEventListener('DOMContentLoaded', function() {
         generateBtn.disabled = true;
         btnText.style.display = 'none';
         btnLoader.style.display = 'inline';
+        btnLoader.textContent = '正在搜索和提取网页内容，请稍候...';
         
         try {
-            // 设置超时（60秒）
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000);
+            debugLog('准备发送生成计划请求', formData);
             
+            // 设置超时（120秒，因为需要搜索和提取网页）
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000);
+            
+            debugLog('发送请求到 /api/generate-plan...');
             const response = await fetch('/api/generate-plan', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(formData),
-                signal: controller.signal
+                signal: controller.signal,
+                credentials: 'same-origin'
             });
             
             clearTimeout(timeoutId);
             
+            debugLog('收到服务器响应', { status: response.status, ok: response.ok, statusText: response.statusText });
+            
             if (!response.ok) {
-                throw new Error(`HTTP错误: ${response.status}`);
+                const errorText = await response.text();
+                debugLog('服务器返回错误', { status: response.status, error: errorText });
+                throw new Error(`HTTP错误: ${response.status} - ${errorText.substring(0, 100)}`);
             }
             
             const data = await response.json();
@@ -99,6 +108,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 将markdown格式转换为HTML（简单处理）
                 planContent.innerHTML = formatPlan(data.plan);
+                
+                // 如果有参考链接，在末尾添加
+                if (data.references && data.references.length > 0) {
+                    let referencesHtml = '<div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">';
+                    referencesHtml += '<h3 style="color: #667eea; margin-bottom: 15px;">📚 参考资料来源</h3>';
+                    referencesHtml += '<p style="color: #666; margin-bottom: 15px;">本计划基于以下网络资源生成，您可以点击链接查看原文：</p>';
+                    referencesHtml += '<ul style="list-style: none; padding: 0;">';
+                    data.references.forEach((ref, index) => {
+                        if (ref.link) {
+                            referencesHtml += `<li style="margin-bottom: 10px;"><a href="${ref.link}" target="_blank" style="color: #667eea; text-decoration: none; word-break: break-all;">${index + 1}. ${ref.title || ref.link}</a></li>`;
+                        } else {
+                            referencesHtml += `<li style="margin-bottom: 10px; color: #666;">${index + 1}. ${ref.title || '无标题'}</li>`;
+                        }
+                    });
+                    referencesHtml += '</ul>';
+                    referencesHtml += '<p style="color: #999; font-size: 0.9em; margin-top: 15px; font-style: italic;">*注：以上链接仅供参考，请以实际情况为准。*</p>';
+                    referencesHtml += '</div>';
+                    planContent.innerHTML += referencesHtml;
+                }
                 
                 // 滚动到结果区域
                 resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -112,11 +140,22 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Error:', error);
+            debugLog('生成计划出错', { 
+                name: error.name, 
+                message: error.message,
+                stack: error.stack 
+            });
+            
+            let errorMsg = '生成计划时出错：';
             if (error.name === 'AbortError') {
-                showError('请求超时，请稍后重试。如果问题持续，请检查网络连接或API配置。');
+                errorMsg = '请求超时（超过120秒）。这可能是正常的，因为需要搜索和提取多个网页内容。请稍后重试。';
+            } else if (error.message === 'Failed to fetch') {
+                errorMsg = '无法连接到服务器。请检查：\n1. 服务器是否正在运行（运行 python app.py）\n2. 服务器地址是否正确\n3. 网络连接是否正常';
             } else {
-                showError('网络错误，请检查您的连接或API配置。错误详情：' + error.message);
+                errorMsg += error.message;
             }
+            
+            showError(errorMsg);
         } finally {
             // 恢复按钮状态
             generateBtn.disabled = false;
