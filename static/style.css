@@ -43,6 +43,118 @@ main {
     padding: 40px;
 }
 
+.search-container {
+    background: #f8f9fa;
+    padding: 30px;
+    border-radius: 15px;
+    margin-bottom: 30px;
+}
+
+.search-container h2 {
+    color: #333;
+    font-size: 1.5em;
+    margin-bottom: 20px;
+}
+
+.search-box {
+    display: flex;
+    gap: 10px;
+}
+
+.search-box input {
+    flex: 1;
+    padding: 12px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1em;
+    transition: all 0.3s ease;
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.btn-search {
+    padding: 12px 30px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-search:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-search:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.search-results {
+    margin-top: 20px;
+    animation: fadeIn 0.5s ease;
+}
+
+.search-result-item {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    border-left: 4px solid #667eea;
+    transition: all 0.3s ease;
+}
+
+.search-result-item:hover {
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    transform: translateX(5px);
+}
+
+.search-result-item h3 {
+    color: #667eea;
+    margin-bottom: 10px;
+    font-size: 1.2em;
+}
+
+.search-result-item h3 a {
+    color: #667eea;
+    text-decoration: none;
+}
+
+.search-result-item h3 a:hover {
+    text-decoration: underline;
+}
+
+.search-result-item p {
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 10px;
+}
+
+.search-result-item .result-link {
+    color: #999;
+    font-size: 0.9em;
+    word-break: break-all;
+}
+
+.search-result-item .result-link a {
+    color: #999;
+    text-decoration: none;
+}
+
+.search-result-item .result-link a:hover {
+    color: #667eea;
+    text-decoration: underline;
+}
+
 .form-container {
     background: #f8f9fa;
     padding: 30px;

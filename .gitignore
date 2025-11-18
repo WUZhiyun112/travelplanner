@@ -26,3 +26,7 @@ Thumbs.db
 instance/
 .webassets-cache
 
+# Logs
+logs/
+*.log
+

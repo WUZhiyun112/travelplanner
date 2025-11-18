@@ -7,6 +7,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const errorContainer = document.getElementById('errorContainer');
     const planContent = document.getElementById('planContent');
     const copyBtn = document.getElementById('copyBtn');
+    
+    // 搜索功能
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const searchResults = document.getElementById('searchResults');
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -62,7 +67,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else {
                 // 显示错误
-                showError(data.error || '生成计划时出错，请稍后重试');
+                let errorMsg = data.error || '生成计划时出错，请稍后重试';
+                if (data.detail) {
+                    console.error('详细错误信息:', data.detail);
+                }
+                showError(errorMsg);
             }
         } catch (error) {
             console.error('Error:', error);
@@ -78,6 +87,92 @@ document.addEventListener('DOMContentLoaded', function() {
             btnLoader.style.display = 'none';
         }
     });
+
+    // 搜索功能
+    searchBtn.addEventListener('click', async function() {
+        const query = searchInput.value.trim();
+        if (!query) {
+            alert('请输入搜索关键词');
+            return;
+        }
+        
+        searchBtn.disabled = true;
+        searchBtn.textContent = '搜索中...';
+        searchResults.style.display = 'none';
+        
+        try {
+            const response = await fetch('/api/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query: query })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP错误: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                displaySearchResults(data.results, data.using_api !== false);
+                searchResults.style.display = 'block';
+                searchResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                alert(data.error || '搜索失败，请稍后重试');
+            }
+        } catch (error) {
+            console.error('搜索错误:', error);
+            alert('搜索时出错：' + error.message);
+        } finally {
+            searchBtn.disabled = false;
+            searchBtn.textContent = '搜索';
+        }
+    });
+    
+    // 支持回车键搜索
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchBtn.click();
+        }
+    });
+    
+    function displaySearchResults(results, usingApi = true) {
+        if (results.length === 0) {
+            searchResults.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">未找到相关结果</p>';
+            return;
+        }
+        
+        let html = '<h3 style="margin-bottom: 15px; color: #333;">搜索结果：</h3>';
+        
+        if (!usingApi) {
+            html += '<div style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #856404;">';
+            html += '<strong>提示：</strong>未配置Google API，显示的是搜索链接。配置API后可获得更详细的搜索结果。';
+            html += '</div>';
+        }
+        
+        results.forEach(result => {
+            if (result.is_link_only) {
+                html += `
+                    <div class="search-result-item">
+                        <h3><a href="${result.link}" target="_blank">${result.title}</a></h3>
+                        <p>${result.snippet}</p>
+                        <div class="result-link"><a href="${result.link}" target="_blank">点击访问Google搜索</a></div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="search-result-item">
+                        <h3><a href="${result.link}" target="_blank">${result.title}</a></h3>
+                        <p>${result.snippet}</p>
+                        <div class="result-link"><a href="${result.link}" target="_blank">${result.link}</a></div>
+                    </div>
+                `;
+            }
+        });
+        searchResults.innerHTML = html;
+    }
 
     // 复制功能
     copyBtn.addEventListener('click', function() {
