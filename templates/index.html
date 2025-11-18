@@ -19,7 +19,7 @@
                 <h2>🔍 搜索旅游信息</h2>
                 <div class="search-box">
                     <input type="text" id="searchInput" placeholder="搜索景点、餐厅、酒店等信息..." />
-                    <button id="searchBtn" class="btn-search">搜索</button>
+                    <button type="button" id="searchBtn" class="btn-search">搜索</button>
                 </div>
                 <div id="searchResults" class="search-results" style="display: none;"></div>
             </div>
@@ -63,6 +63,12 @@
 
             <div id="errorContainer" class="error-container" style="display: none;">
                 <div class="error-message"></div>
+            </div>
+            
+            <!-- 调试信息显示区域 -->
+            <div id="debugContainer" class="debug-container" style="display: none;">
+                <h3>调试信息</h3>
+                <div id="debugContent" class="debug-content"></div>
             </div>
         </main>
 

@@ -315,6 +315,36 @@ main {
     font-weight: 600;
 }
 
+.debug-container {
+    background: #f0f0f0;
+    border: 2px solid #999;
+    padding: 20px;
+    border-radius: 10px;
+    margin-top: 20px;
+    animation: fadeIn 0.5s ease;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.debug-container h3 {
+    color: #666;
+    margin-bottom: 10px;
+    font-size: 1.2em;
+}
+
+.debug-content {
+    background: white;
+    padding: 15px;
+    border-radius: 5px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    color: #333;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
 footer {
     background: #f8f9fa;
     padding: 20px;

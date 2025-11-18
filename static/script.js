@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('页面加载完成，初始化脚本...');
+    
     const form = document.getElementById('travelForm');
     const generateBtn = document.getElementById('generateBtn');
     const btnText = document.querySelector('.btn-text');
@@ -12,6 +14,41 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('searchInput');
     const searchBtn = document.getElementById('searchBtn');
     const searchResults = document.getElementById('searchResults');
+    
+    // 调试信息显示
+    const debugContainer = document.getElementById('debugContainer');
+    const debugContent = document.getElementById('debugContent');
+    
+    // 调试日志函数
+    function debugLog(message, data = null) {
+        const timestamp = new Date().toLocaleTimeString();
+        let logMessage = `[${timestamp}] ${message}`;
+        if (data) {
+            logMessage += '\n' + JSON.stringify(data, null, 2);
+        }
+        
+        // 显示在页面上
+        if (debugContainer && debugContent) {
+            debugContainer.style.display = 'block';
+            debugContent.textContent += logMessage + '\n\n';
+            debugContent.scrollTop = debugContent.scrollHeight;
+        }
+        
+        // 同时输出到控制台
+        console.log(message, data || '');
+    }
+    
+    // 检查元素是否存在
+    const elementsCheck = {
+        searchInput: !!searchInput,
+        searchBtn: !!searchBtn,
+        searchResults: !!searchResults
+    };
+    debugLog('搜索元素检查', elementsCheck);
+    
+    if (!searchInput || !searchBtn || !searchResults) {
+        debugLog('错误: 搜索元素未找到', elementsCheck);
+    }
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -89,54 +126,98 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // 搜索功能
-    searchBtn.addEventListener('click', async function() {
-        const query = searchInput.value.trim();
-        if (!query) {
-            alert('请输入搜索关键词');
-            return;
-        }
-        
-        searchBtn.disabled = true;
-        searchBtn.textContent = '搜索中...';
-        searchResults.style.display = 'none';
+    if (searchBtn) {
+        searchBtn.addEventListener('click', async function(e) {
+            e.preventDefault(); // 防止默认行为
+            debugLog('搜索按钮被点击');
+            
+            const query = searchInput ? searchInput.value.trim() : '';
+            if (!query) {
+                alert('请输入搜索关键词');
+                debugLog('错误: 搜索关键词为空');
+                return;
+            }
+            
+            debugLog('开始搜索', { query: query });
+            searchBtn.disabled = true;
+            searchBtn.textContent = '搜索中...';
+            if (searchResults) {
+                searchResults.style.display = 'none';
+            }
         
         try {
+            debugLog('发送搜索请求到服务器...');
+            debugLog('请求URL: /api/search');
+            debugLog('请求数据', { query: query });
+            
             const response = await fetch('/api/search', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ query: query })
+                body: JSON.stringify({ query: query }),
+                credentials: 'same-origin'  // 确保发送cookie
             });
+            
+            debugLog('收到服务器响应', { status: response.status, ok: response.ok, statusText: response.statusText });
             
             if (!response.ok) {
                 throw new Error(`HTTP错误: ${response.status}`);
             }
             
             const data = await response.json();
+            debugLog('解析响应数据', { success: data.success, resultsCount: data.results ? data.results.length : 0 });
             
             if (data.success) {
                 displaySearchResults(data.results, data.using_api !== false);
-                searchResults.style.display = 'block';
-                searchResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (searchResults) {
+                    searchResults.style.display = 'block';
+                    searchResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                debugLog('搜索成功，显示结果');
             } else {
-                alert(data.error || '搜索失败，请稍后重试');
+                const errorMsg = data.error || '搜索失败，请稍后重试';
+                debugLog('搜索失败', { error: errorMsg });
+                alert(errorMsg);
             }
         } catch (error) {
-            console.error('搜索错误:', error);
-            alert('搜索时出错：' + error.message);
+            debugLog('搜索出错', { 
+                name: error.name, 
+                message: error.message,
+                stack: error.stack 
+            });
+            
+            // 提供更友好的错误信息
+            let errorMsg = '搜索时出错：';
+            if (error.message === 'Failed to fetch') {
+                errorMsg = '无法连接到服务器。请检查：\n1. 服务器是否正在运行\n2. 网络连接是否正常\n3. 服务器地址是否正确';
+            } else {
+                errorMsg += error.message;
+            }
+            
+            alert(errorMsg);
         } finally {
-            searchBtn.disabled = false;
-            searchBtn.textContent = '搜索';
+            if (searchBtn) {
+                searchBtn.disabled = false;
+                searchBtn.textContent = '搜索';
+            }
         }
-    });
+        });
+    } else {
+        debugLog('错误: 搜索按钮元素未找到，无法绑定事件');
+    }
     
     // 支持回车键搜索
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            searchBtn.click();
-        }
-    });
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (searchBtn) {
+                    searchBtn.click();
+                }
+            }
+        });
+    }
     
     function displaySearchResults(results, usingApi = true) {
         if (results.length === 0) {

@@ -31,7 +31,8 @@ pip install -r requirements.txt
    **注意**：
    - 如果不配置Google API密钥，应用仍可正常使用
    - 搜索功能会降级为简化模式（只提供搜索链接，不显示详细结果）
-   - 配置API后可以获得完整的搜索结果和自动搜索功能
+   - 配置Google API后可以获得完整的搜索结果和自动搜索功能
+   - Google Custom Search API 需要同时配置API密钥和搜索引擎ID
 
 3. 运行应用：
 ```bash
@@ -51,7 +52,7 @@ python app.py
 ## 注意事项
 
 - 需要有效的 DeepSeek API 密钥
-- 谷歌搜索功能需要配置 Google Custom Search API（可选）
+- 谷歌搜索功能使用 Google Custom Search API（可选）
 - 首次使用可能需要一些时间来生成计划
 - 建议提供尽可能详细的信息以获得更好的计划
 - DeepSeek API 使用 OpenAI 兼容的接口，价格更实惠

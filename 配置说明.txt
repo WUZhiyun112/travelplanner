@@ -33,7 +33,7 @@
    - 获取搜索引擎 ID (CX)
    - 将 API 密钥和搜索引擎 ID 添加到 .env 文件中
    
-   注意：如果不配置Google API密钥，应用仍可正常使用，但不会在生成计划时自动搜索最新信息。
+   注意：如果不配置Google API密钥，应用仍可正常使用，但不会在生成计划时自动搜索最新信息。Google Custom Search API每天有100次免费搜索配额。
 
 5. 运行应用
    - 方法1：双击 start.bat 文件（Windows）

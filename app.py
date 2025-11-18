@@ -41,17 +41,27 @@ client = OpenAI(
     base_url="https://api.deepseek.com"
 )
 
-# 谷歌搜索配置
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
-GOOGLE_SEARCH_ENGINE_ID = os.getenv('GOOGLE_SEARCH_ENGINE_ID', '')
+# Google Custom Search API 配置
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBwyTp6pR1Xwj_Z5_V0YkY_Q4AY53-bzMc')
+GOOGLE_SEARCH_ENGINE_ID = os.getenv('GOOGLE_SEARCH_ENGINE_ID', '5299e07176b844ae6')
+
+# 启动时打印配置信息
+logger.info(f"Google API配置: API_KEY={GOOGLE_API_KEY[:10]}..., SEARCH_ENGINE_ID={GOOGLE_SEARCH_ENGINE_ID}")
+print(f"Google API配置: API_KEY={GOOGLE_API_KEY[:10]}..., SEARCH_ENGINE_ID={GOOGLE_SEARCH_ENGINE_ID}")
 
 def google_search(query, num_results=5):
     """
     使用Google Custom Search API进行搜索
     返回搜索结果列表
     """
-    if not GOOGLE_API_KEY or not GOOGLE_SEARCH_ENGINE_ID:
-        print("警告: 未配置Google API密钥，跳过搜索")
+    if not GOOGLE_API_KEY:
+        logger.warning("警告: 未配置Google API密钥，跳过搜索")
+        return []
+    
+    # 如果没有搜索引擎ID，尝试使用默认的
+    if not GOOGLE_SEARCH_ENGINE_ID:
+        logger.warning("警告: 未配置Google搜索引擎ID，尝试使用API密钥直接搜索")
+        # 注意：Google Custom Search API 需要搜索引擎ID，如果没有则无法搜索
         return []
     
     try:
@@ -60,7 +70,7 @@ def google_search(query, num_results=5):
             'key': GOOGLE_API_KEY,
             'cx': GOOGLE_SEARCH_ENGINE_ID,
             'q': query,
-            'num': num_results
+            'num': min(num_results, 10)  # Google API最多返回10个结果
         }
         
         response = requests.get(url, params=params, timeout=10)
@@ -77,10 +87,12 @@ def google_search(query, num_results=5):
                     'link': item.get('link', '')
                 })
         
-        print(f"谷歌搜索成功，找到 {len(results)} 个结果")
+        logger.info(f"Google搜索成功，找到 {len(results)} 个结果")
+        print(f"Google搜索成功，找到 {len(results)} 个结果")
         return results
     except Exception as e:
-        print(f"谷歌搜索出错: {str(e)}")
+        logger.error(f"Google搜索出错: {str(e)}")
+        print(f"Google搜索出错: {str(e)}")
         return []
 
 def simple_search(query, num_results=5):
@@ -133,12 +145,37 @@ def index():
     """返回主页面"""
     return render_template('index.html')
 
-@app.route('/api/search', methods=['POST'])
+@app.route('/api/search', methods=['POST', 'OPTIONS'])
 def search():
     """独立的搜索API端点"""
+    # 处理CORS预检请求
+    if request.method == 'OPTIONS':
+        response = jsonify({})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+    
     try:
+        logger.info(f"收到搜索请求: {request.method}, Content-Type: {request.content_type}")
+        
+        if not request.is_json:
+            logger.warning("请求不是JSON格式")
+            return jsonify({
+                'success': False,
+                'error': '请求格式错误，需要JSON格式'
+            }), 400
+        
         data = request.json
+        if not data:
+            logger.warning("请求数据为空")
+            return jsonify({
+                'success': False,
+                'error': '请求数据为空'
+            }), 400
+            
         query = data.get('query', '')
+        logger.info(f"搜索关键词: {query}")
         
         if not query:
             return jsonify({
@@ -147,16 +184,22 @@ def search():
             }), 400
         
         # 优先使用Google API，如果没有配置则使用简化版
-        if GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID:
+        has_api = bool(GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID)
+        logger.info(f"搜索请求: query={query}, has_api={has_api}, API_KEY={bool(GOOGLE_API_KEY)}, SEARCH_ENGINE_ID={bool(GOOGLE_SEARCH_ENGINE_ID)}")
+        
+        if has_api:
+            logger.info("使用Google Custom Search API进行搜索")
             results = google_search(query, num_results=10)
         else:
+            logger.warning("未配置完整Google API，使用简化版搜索")
             # 使用简化版搜索（返回搜索链接）
             results = simple_search(query, num_results=10)
         
+        logger.info(f"搜索完成，返回 {len(results)} 个结果")
         return jsonify({
             'success': True,
             'results': results,
-            'using_api': bool(GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID)
+            'using_api': has_api
         })
     except Exception as e:
         import traceback
