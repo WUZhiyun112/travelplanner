@@ -6,10 +6,10 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #F8F2EC;
     min-height: 100vh;
     padding: 20px;
-    color: #333;
+    color: #3F605B;
 }
 
 .container {
@@ -17,15 +17,17 @@ body {
     margin: 0 auto;
     background: white;
     border-radius: 20px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 40px rgba(18, 14, 16, 0.15);
+    border: 2px solid #3F605B;
     overflow: hidden;
 }
 
 header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: #3F605B;
+    color: #F8F2EC;
     padding: 40px;
     text-align: center;
+    border-bottom: 3px solid #A9423C;
 }
 
 header h1 {
@@ -44,14 +46,15 @@ main {
 }
 
 .search-container {
-    background: #f8f9fa;
+    background: #F8F2EC;
     padding: 30px;
     border-radius: 15px;
     margin-bottom: 30px;
+    border: 2px solid #3F605B;
 }
 
 .search-container h2 {
-    color: #333;
+    color: #3F605B;
     font-size: 1.5em;
     margin-bottom: 20px;
 }
@@ -64,21 +67,23 @@ main {
 .search-box input {
     flex: 1;
     padding: 12px 15px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid #3F605B;
     border-radius: 8px;
     font-size: 1em;
     transition: all 0.3s ease;
+    background: white;
+    color: #3F605B;
 }
 
 .search-box input:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #1D4C50;
+    box-shadow: 0 0 0 3px rgba(20, 89, 207, 0.1);
 }
 
 .btn-search {
     padding: 12px 30px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1D4C50;
     color: white;
     border: none;
     border-radius: 8px;
@@ -90,7 +95,8 @@ main {
 
 .btn-search:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 5px 15px rgba(20, 89, 207, 0.4);
+    background: #3F605B;
 }
 
 .btn-search:disabled {
@@ -109,7 +115,7 @@ main {
     padding: 20px;
     border-radius: 10px;
     margin-bottom: 15px;
-    border-left: 4px solid #667eea;
+    border-left: 4px solid #1D4C50;
     transition: all 0.3s ease;
 }
 
@@ -119,47 +125,52 @@ main {
 }
 
 .search-result-item h3 {
-    color: #667eea;
+    color: #1D4C50;
     margin-bottom: 10px;
     font-size: 1.2em;
 }
 
 .search-result-item h3 a {
-    color: #667eea;
+    color: #1D4C50;
     text-decoration: none;
 }
 
 .search-result-item h3 a:hover {
     text-decoration: underline;
+    color: #A9423C;
 }
 
 .search-result-item p {
-    color: #666;
+    color: #3F605B;
     line-height: 1.6;
     margin-bottom: 10px;
+    opacity: 0.8;
 }
 
 .search-result-item .result-link {
-    color: #999;
+    color: #3F605B;
     font-size: 0.9em;
     word-break: break-all;
+    opacity: 0.6;
 }
 
 .search-result-item .result-link a {
-    color: #999;
+    color: #3F605B;
     text-decoration: none;
+    opacity: 0.6;
 }
 
 .search-result-item .result-link a:hover {
-    color: #667eea;
+    color: #1D4C50;
     text-decoration: underline;
 }
 
 .form-container {
-    background: #f8f9fa;
+    background: #F8F2EC;
     padding: 30px;
     border-radius: 15px;
     margin-bottom: 30px;
+    border: 2px solid #3F605B;
 }
 
 .form-group {
@@ -170,7 +181,7 @@ main {
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
-    color: #555;
+    color: #3F605B;
     font-size: 1em;
 }
 
@@ -178,18 +189,20 @@ main {
 .form-group textarea {
     width: 100%;
     padding: 12px 15px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid #3F605B;
     border-radius: 8px;
     font-size: 1em;
     transition: all 0.3s ease;
     font-family: inherit;
+    background: white;
+    color: #3F605B;
 }
 
 .form-group input:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #1D4C50;
+    box-shadow: 0 0 0 3px rgba(20, 89, 207, 0.1);
 }
 
 .form-group textarea {
@@ -197,10 +210,49 @@ main {
     min-height: 80px;
 }
 
+.budget-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.budget-input-group input {
+    flex: 1;
+    min-width: 0;
+}
+
+.currency-select {
+    flex: 0 0 200px;
+    padding: 12px 15px;
+    border: 2px solid #3F605B;
+    border-radius: 8px;
+    font-size: 1em;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    background: white;
+    color: #3F605B;
+    cursor: pointer;
+}
+
+.currency-select:focus {
+    outline: none;
+    border-color: #1D4C50;
+    box-shadow: 0 0 0 3px rgba(20, 89, 207, 0.1);
+}
+
+.budget-hint {
+    display: block;
+    margin-top: 8px;
+    color: #3F605B;
+    font-size: 0.85em;
+    font-style: italic;
+    opacity: 0.7;
+}
+
 .btn-primary {
     width: 100%;
     padding: 15px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #A9423C;
     color: white;
     border: none;
     border-radius: 8px;
@@ -213,7 +265,8 @@ main {
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 10px 25px rgba(169, 66, 60, 0.4);
+    background: #c55a52;
 }
 
 .btn-primary:active {
@@ -228,7 +281,7 @@ main {
 
 .btn-secondary {
     padding: 8px 20px;
-    background: #6c757d;
+    background: #1D4C50;
     color: white;
     border: none;
     border-radius: 6px;
@@ -238,16 +291,17 @@ main {
 }
 
 .btn-secondary:hover {
-    background: #5a6268;
+    background: #3F605B;
     transform: translateY(-1px);
 }
 
 .result-container {
-    background: #f8f9fa;
+    background: #F8F2EC;
     padding: 30px;
     border-radius: 15px;
     margin-top: 30px;
     animation: fadeIn 0.5s ease;
+    border: 2px solid #3F605B;
 }
 
 .result-header {
@@ -256,11 +310,11 @@ main {
     align-items: center;
     margin-bottom: 20px;
     padding-bottom: 15px;
-    border-bottom: 2px solid #e0e0e0;
+    border-bottom: 2px solid #3F605B;
 }
 
 .result-header h2 {
-    color: #333;
+    color: #3F605B;
     font-size: 1.8em;
 }
 
@@ -269,20 +323,21 @@ main {
     padding: 25px;
     border-radius: 10px;
     line-height: 1.8;
-    color: #444;
+    color: #3F605B;
     white-space: pre-wrap;
     font-size: 1em;
+    border: 1px solid #3F605B;
 }
 
 .plan-content h3 {
-    color: #667eea;
+    color: #1D4C50;
     margin-top: 25px;
     margin-bottom: 15px;
     font-size: 1.4em;
 }
 
 .plan-content h4 {
-    color: #764ba2;
+    color: #A9423C;
     margin-top: 20px;
     margin-bottom: 10px;
     font-size: 1.2em;
@@ -298,11 +353,11 @@ main {
 }
 
 .plan-content strong {
-    color: #333;
+    color: #3F605B;
 }
 
 .plan-content a {
-    color: #667eea;
+    color: #1D4C50;
     text-decoration: none;
     transition: color 0.3s ease;
     word-break: break-all;
@@ -310,12 +365,12 @@ main {
 
 .plan-content a:hover {
     text-decoration: underline;
-    color: #764ba2;
+    color: #A9423C;
 }
 
 .error-container {
-    background: #fee;
-    border: 2px solid #fcc;
+    background: #F8F2EC;
+    border: 2px solid #A9423C;
     padding: 20px;
     border-radius: 10px;
     margin-top: 20px;
@@ -323,13 +378,13 @@ main {
 }
 
 .error-message {
-    color: #c33;
+    color: #A9423C;
     font-weight: 600;
 }
 
 .debug-container {
-    background: #f0f0f0;
-    border: 2px solid #999;
+    background: #F8F2EC;
+    border: 2px solid #3F605B;
     padding: 20px;
     border-radius: 10px;
     margin-top: 20px;
@@ -339,7 +394,7 @@ main {
 }
 
 .debug-container h3 {
-    color: #666;
+    color: #3F605B;
     margin-bottom: 10px;
     font-size: 1.2em;
 }
@@ -358,11 +413,12 @@ main {
 }
 
 footer {
-    background: #f8f9fa;
+    background: #F8F2EC;
     padding: 20px;
     text-align: center;
-    color: #666;
+    color: #3F605B;
     font-size: 0.9em;
+    border-top: 2px solid #3F605B;
 }
 
 @keyframes fadeIn {
@@ -387,6 +443,15 @@ footer {
     
     .form-container {
         padding: 20px;
+    }
+    
+    .budget-input-group {
+        flex-direction: column;
+    }
+    
+    .currency-select {
+        flex: 1;
+        width: 100%;
     }
     
     .result-header {

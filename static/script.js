@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('页面加载完成，初始化脚本...');
+    console.log('Page loaded, initializing script...');
     
     const form = document.getElementById('travelForm');
     const generateBtn = document.getElementById('generateBtn');
@@ -10,16 +10,53 @@ document.addEventListener('DOMContentLoaded', function() {
     const planContent = document.getElementById('planContent');
     const copyBtn = document.getElementById('copyBtn');
     
-    // 搜索功能
+    // Search functionality
     const searchInput = document.getElementById('searchInput');
     const searchBtn = document.getElementById('searchBtn');
     const searchResults = document.getElementById('searchResults');
     
-    // 调试信息显示
+    // Debug information display
     const debugContainer = document.getElementById('debugContainer');
     const debugContent = document.getElementById('debugContent');
     
-    // 调试日志函数
+    // Set custom validation messages in English
+    const daysInput = document.getElementById('days');
+    const destinationInput = document.getElementById('destination');
+    
+    // Set custom validation messages in English for all required fields
+    if (daysInput) {
+        daysInput.addEventListener('invalid', function(e) {
+            if (daysInput.validity.valueMissing) {
+                daysInput.setCustomValidity('Please enter the number of travel days');
+            } else if (daysInput.validity.rangeUnderflow) {
+                daysInput.setCustomValidity('Please enter a number greater than or equal to 1');
+            } else if (daysInput.validity.rangeOverflow) {
+                daysInput.setCustomValidity('Please enter a number less than or equal to 30');
+            } else {
+                daysInput.setCustomValidity('Please enter a valid number');
+            }
+        });
+        
+        daysInput.addEventListener('input', function() {
+            daysInput.setCustomValidity('');
+        });
+    }
+    
+    if (destinationInput) {
+        destinationInput.addEventListener('invalid', function(e) {
+            if (destinationInput.validity.valueMissing) {
+                destinationInput.setCustomValidity('Please enter your travel destination');
+            } else {
+                destinationInput.setCustomValidity('Please enter a valid destination');
+            }
+        });
+        
+        destinationInput.addEventListener('input', function() {
+            destinationInput.setCustomValidity('');
+        });
+    }
+    
+    // Debug log function
     function debugLog(message, data = null) {
         const timestamp = new Date().toLocaleTimeString();
         let logMessage = `[${timestamp}] ${message}`;
@@ -27,58 +64,80 @@ document.addEventListener('DOMContentLoaded', function() {
             logMessage += '\n' + JSON.stringify(data, null, 2);
         }
         
-        // 显示在页面上
+        // Display on page
         if (debugContainer && debugContent) {
             debugContainer.style.display = 'block';
             debugContent.textContent += logMessage + '\n\n';
             debugContent.scrollTop = debugContent.scrollHeight;
         }
         
-        // 同时输出到控制台
+        // Also output to console
         console.log(message, data || '');
     }
     
-    // 检查元素是否存在
+    // Check if elements exist
     const elementsCheck = {
         searchInput: !!searchInput,
         searchBtn: !!searchBtn,
         searchResults: !!searchResults
     };
-    debugLog('搜索元素检查', elementsCheck);
+    debugLog('Search elements check', elementsCheck);
     
     if (!searchInput || !searchBtn || !searchResults) {
-        debugLog('错误: 搜索元素未找到', elementsCheck);
+        debugLog('Error: Search elements not found', elementsCheck);
     }
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        // 隐藏之前的结果和错误
+        // Hide previous results and errors
         resultContainer.style.display = 'none';
         errorContainer.style.display = 'none';
         
-        // 获取表单数据
+        // Validate form fields first
+        if (!form.checkValidity()) {
+            // Trigger validation messages
+            form.reportValidity();
+            return;
+        }
+        
+        // Get form data
+        const budgetAmount = document.getElementById('budget').value.trim();
+        const currency = document.getElementById('currency').value;
+        
+        // Validate budget: if amount is entered, currency must be selected
+        if (budgetAmount && !currency) {
+            showError('Please select a currency if you enter a budget amount');
+            return;
+        }
+        
+        // Combine budget amount and currency
+        let budget = '';
+        if (budgetAmount && currency) {
+            budget = `${budgetAmount} ${currency}`;
+        }
+        
         const formData = {
             days: document.getElementById('days').value,
             destination: document.getElementById('destination').value,
-            budget: document.getElementById('budget').value,
+            budget: budget,
             preferences: document.getElementById('preferences').value
         };
         
-        // 显示加载状态
+        // Show loading state
         generateBtn.disabled = true;
         btnText.style.display = 'none';
         btnLoader.style.display = 'inline';
-        btnLoader.textContent = '正在搜索和提取网页内容，请稍候...';
+        btnLoader.textContent = 'Generating your travel plan, please wait...';
         
         try {
-            debugLog('准备发送生成计划请求', formData);
+            debugLog('Preparing to send generate plan request', formData);
             
-            // 设置超时（120秒，因为需要搜索和提取网页）
+            // Set timeout (120 seconds)
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 120000);
             
-            debugLog('发送请求到 /api/generate-plan...');
+            debugLog('Sending request to /api/generate-plan...');
             const response = await fetch('/api/generate-plan', {
                 method: 'POST',
                 headers: {
@@ -91,86 +150,86 @@ document.addEventListener('DOMContentLoaded', function() {
             
             clearTimeout(timeoutId);
             
-            debugLog('收到服务器响应', { status: response.status, ok: response.ok, statusText: response.statusText });
+            debugLog('Received server response', { status: response.status, ok: response.ok, statusText: response.statusText });
             
             if (!response.ok) {
                 const errorText = await response.text();
-                debugLog('服务器返回错误', { status: response.status, error: errorText });
-                throw new Error(`HTTP错误: ${response.status} - ${errorText.substring(0, 100)}`);
+                debugLog('Server returned error', { status: response.status, error: errorText });
+                throw new Error(`HTTP Error: ${response.status} - ${errorText.substring(0, 100)}`);
             }
             
             const data = await response.json();
             
             if (data.success) {
-                // 显示结果
+                // Display results
                 planContent.textContent = data.plan;
                 resultContainer.style.display = 'block';
                 
-                // 将markdown格式转换为HTML（简单处理）
+                // Convert markdown format to HTML (simple processing)
                 planContent.innerHTML = formatPlan(data.plan);
                 
-                // 生成计划功能不使用搜索，所以不显示参考链接
+                // Plan generation doesn't use search, so no reference links
                 
-                // 滚动到结果区域
+                // Scroll to result area
                 resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else {
-                // 显示错误
-                let errorMsg = data.error || '生成计划时出错，请稍后重试';
+                // Display error
+                let errorMsg = data.error || 'Error generating plan, please try again later';
                 if (data.detail) {
-                    console.error('详细错误信息:', data.detail);
+                    console.error('Detailed error information:', data.detail);
                 }
                 showError(errorMsg);
             }
         } catch (error) {
             console.error('Error:', error);
-            debugLog('生成计划出错', { 
+            debugLog('Error generating plan', { 
                 name: error.name, 
                 message: error.message,
                 stack: error.stack 
             });
             
-            let errorMsg = '生成计划时出错：';
+            let errorMsg = 'Error generating plan: ';
             if (error.name === 'AbortError') {
-                errorMsg = '请求超时（超过120秒）。这可能是正常的，因为需要搜索和提取多个网页内容。请稍后重试。';
+                errorMsg = 'Request timeout (exceeded 120 seconds). Please try again later.';
             } else if (error.message === 'Failed to fetch') {
-                errorMsg = '无法连接到服务器。请检查：\n1. 服务器是否正在运行（运行 python app.py）\n2. 服务器地址是否正确\n3. 网络连接是否正常';
+                errorMsg = 'Unable to connect to server. Please check:\n1. Is the server running (run python app.py)\n2. Is the server address correct\n3. Is the network connection normal';
             } else {
                 errorMsg += error.message;
             }
             
             showError(errorMsg);
         } finally {
-            // 恢复按钮状态
+            // Restore button state
             generateBtn.disabled = false;
             btnText.style.display = 'inline';
             btnLoader.style.display = 'none';
         }
     });
 
-    // 搜索功能
+    // Search functionality
     if (searchBtn) {
         searchBtn.addEventListener('click', async function(e) {
-            e.preventDefault(); // 防止默认行为
-            debugLog('搜索按钮被点击');
+            e.preventDefault(); // Prevent default behavior
+            debugLog('Search button clicked');
             
             const query = searchInput ? searchInput.value.trim() : '';
             if (!query) {
-                alert('请输入搜索关键词');
-                debugLog('错误: 搜索关键词为空');
+                alert('Please enter a search keyword');
+                debugLog('Error: Search keyword is empty');
                 return;
             }
             
-            debugLog('开始搜索', { query: query });
+            debugLog('Starting search', { query: query });
             searchBtn.disabled = true;
-            searchBtn.textContent = '正在搜索和总结，请稍候...';
+            searchBtn.textContent = 'Searching and summarizing, please wait...';
             if (searchResults) {
                 searchResults.style.display = 'none';
             }
         
         try {
-            debugLog('发送搜索请求到服务器...');
-            debugLog('请求URL: /api/search');
-            debugLog('请求数据', { query: query });
+            debugLog('Sending search request to server...');
+            debugLog('Request URL: /api/search');
+            debugLog('Request data', { query: query });
             
             const response = await fetch('/api/search', {
                 method: 'POST',
@@ -178,35 +237,35 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ query: query }),
-                credentials: 'same-origin'  // 确保发送cookie
+                credentials: 'same-origin'  // Ensure cookies are sent
             });
             
-            debugLog('收到服务器响应', { status: response.status, ok: response.ok, statusText: response.statusText });
+            debugLog('Received server response', { status: response.status, ok: response.ok, statusText: response.statusText });
             
             if (!response.ok) {
-                throw new Error(`HTTP错误: ${response.status}`);
+                throw new Error(`HTTP Error: ${response.status}`);
             }
             
             const data = await response.json();
-            debugLog('解析响应数据', { success: data.success, hasSummary: !!data.summary, referencesCount: data.references ? data.references.length : 0 });
+            debugLog('Parsed response data', { success: data.success, hasSummary: !!data.summary, referencesCount: data.references ? data.references.length : 0 });
             
             displaySearchResults(data);
             if (searchResults) {
                 searchResults.style.display = 'block';
                 searchResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
-            debugLog('搜索完成，显示结果');
+            debugLog('Search completed, displaying results');
         } catch (error) {
-            debugLog('搜索出错', { 
+            debugLog('Search error', { 
                 name: error.name, 
                 message: error.message,
                 stack: error.stack 
             });
             
-            // 提供更友好的错误信息
-            let errorMsg = '搜索时出错：';
+            // Provide more friendly error message
+            let errorMsg = 'Error during search: ';
             if (error.message === 'Failed to fetch') {
-                errorMsg = '无法连接到服务器。请检查：\n1. 服务器是否正在运行\n2. 网络连接是否正常\n3. 服务器地址是否正确';
+                errorMsg = 'Unable to connect to server. Please check:\n1. Is the server running\n2. Is the network connection normal\n3. Is the server address correct';
             } else {
                 errorMsg += error.message;
             }
@@ -215,15 +274,15 @@ document.addEventListener('DOMContentLoaded', function() {
         } finally {
             if (searchBtn) {
                 searchBtn.disabled = false;
-                searchBtn.textContent = '搜索';
+                searchBtn.textContent = 'Search';
             }
         }
         });
     } else {
-        debugLog('错误: 搜索按钮元素未找到，无法绑定事件');
+        debugLog('Error: Search button element not found, cannot bind event');
     }
     
-    // 支持回车键搜索
+    // Support Enter key search
     if (searchInput) {
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -237,61 +296,61 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function displaySearchResults(data) {
         if (!data.success) {
-            searchResults.innerHTML = `<div class="error-container"><div class="error-message">${data.error || '搜索失败'}</div></div>`;
+            searchResults.innerHTML = `<div class="error-container"><div class="error-message">${data.error || 'Search failed'}</div></div>`;
             return;
         }
         
-        // 显示AI总结的结果
+        // Display AI summary results
         let html = '<div style="background: white; padding: 25px; border-radius: 10px; margin-bottom: 20px;">';
-        html += '<h3 style="color: #667eea; margin-bottom: 15px; font-size: 1.4em;">📋 Search Results Summary</h3>';
+        html += '<h3 style="color: #1459CF; margin-bottom: 15px; font-size: 1.4em;">Search Results Summary</h3>';
         
-        // 如果有错误，显示警告
+        // If there's an error, display a warning
         if (data.summary_error) {
-            html += '<div style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 8px; margin-bottom: 15px; color: #856404;">';
-            html += '<strong>⚠️ Warning:</strong> AI summary failed. Showing search results instead.';
+            html += '<div style="background: #F8F2EC; border: 2px solid #A9423C; padding: 15px; border-radius: 8px; margin-bottom: 15px; color: #A9423C;">';
+            html += '<strong>Warning:</strong> AI summary failed. Showing search results instead.';
             html += '</div>';
         }
         
-        html += '<div style="line-height: 1.8; color: #444; white-space: pre-wrap; margin-bottom: 20px;">';
+        html += '<div style="line-height: 1.8; color: #120E10; white-space: pre-wrap; margin-bottom: 20px;">';
         html += data.summary || 'No summary available';
         html += '</div>';
         html += '</div>';
         
-        // 显示参考链接
+        // Display reference links
         if (data.references && data.references.length > 0) {
-            html += '<div style="background: #f8f9fa; padding: 20px; border-radius: 10px; border-top: 2px solid #e0e0e0;">';
-            html += '<h3 style="color: #667eea; margin-bottom: 15px; font-size: 1.2em;">📚 Reference Sources</h3>';
-            html += '<p style="color: #666; margin-bottom: 15px;">The following articles were found from web search. Click the links to view the original articles:</p>';
+            html += '<div style="background: #F8F2EC; padding: 20px; border-radius: 10px; border-top: 2px solid #7097DE;">';
+            html += '<h3 style="color: #1459CF; margin-bottom: 15px; font-size: 1.2em;">Reference Sources</h3>';
+            html += '<p style="color: #120E10; margin-bottom: 15px;">The following articles were found from web search. Click the links to view the original articles:</p>';
             html += '<ul style="list-style: none; padding: 0;">';
             data.references.forEach((ref, index) => {
                 if (ref.link) {
-                    html += `<li style="margin-bottom: 10px;"><a href="${ref.link}" target="_blank" style="color: #667eea; text-decoration: none; word-break: break-all;">${index + 1}. ${ref.title || ref.link}</a></li>`;
+                    html += `<li style="margin-bottom: 10px;"><a href="${ref.link}" target="_blank" style="color: #1459CF; text-decoration: none; word-break: break-all;">${index + 1}. ${ref.title || ref.link}</a></li>`;
                 } else {
-                    html += `<li style="margin-bottom: 10px; color: #666;">${index + 1}. ${ref.title || '无标题'}</li>`;
+                    html += `<li style="margin-bottom: 10px; color: #120E10;">${index + 1}. ${ref.title || 'No title'}</li>`;
                 }
             });
             html += '</ul>';
-            html += '<p style="color: #999; font-size: 0.9em; margin-top: 15px; font-style: italic;">*Note: The above links are for reference only. Please verify the actual information.*</p>';
+            html += '<p style="color: #120E10; opacity: 0.7; font-size: 0.9em; margin-top: 15px; font-style: italic;">*Note: The above links are for reference only. Please verify the actual information.*</p>';
             html += '</div>';
         }
         
         searchResults.innerHTML = html;
     }
 
-    // 复制功能
+    // Copy functionality
     copyBtn.addEventListener('click', function() {
         const text = planContent.textContent || planContent.innerText;
         navigator.clipboard.writeText(text).then(function() {
             const originalText = copyBtn.textContent;
-            copyBtn.textContent = '已复制！';
+            copyBtn.textContent = 'Copied!';
             copyBtn.style.background = '#28a745';
             setTimeout(function() {
                 copyBtn.textContent = originalText;
-                copyBtn.style.background = '#6c757d';
+                copyBtn.style.background = '#495057';
             }, 2000);
         }).catch(function(err) {
-            console.error('复制失败:', err);
-            alert('复制失败，请手动选择文本复制');
+            console.error('Copy failed:', err);
+            alert('Copy failed, please manually select and copy the text');
         });
     });
 
@@ -302,25 +361,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function formatPlan(text) {
-        // 简单的markdown到HTML转换
+        // Simple markdown to HTML conversion
         let html = text;
         
-        // 标题
+        // Headings
         html = html.replace(/^## (.*$)/gim, '<h3>$1</h3>');
         html = html.replace(/^### (.*$)/gim, '<h4>$1</h4>');
         
-        // 粗体
+        // Bold
         html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         
-        // 列表项
+        // List items
         html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
         
-        // 将连续的列表项包装在ul标签中
+        // Wrap consecutive list items in ul tags
         html = html.replace(/(<li>.*<\/li>\n?)+/g, function(match) {
             return '<ul>' + match.replace(/\n/g, '') + '</ul>';
         });
         
-        // 换行
+        // Line breaks
         html = html.replace(/\n\n/g, '</p><p>');
         html = '<p>' + html + '</p>';
         

@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能旅游计划生成器</title>
+    <title>AI Travel Planner</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🌍 智能旅游计划生成器</h1>
-            <p class="subtitle">输入您的旅游信息，AI将为您生成详细的旅游计划</p>
+            <h1>AI Travel Planner</h1>
+            <p class="subtitle">Enter your travel information and AI will generate a detailed travel plan for you</p>
         </header>
 
         <main>
-            <!-- 搜索功能区域 -->
+            <!-- Search Section -->
             <div class="search-container">
-                <h2>🔍 搜索旅游信息</h2>
+                <h2>Search Travel Information</h2>
                 <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="搜索景点、餐厅、酒店等信息..." />
-                    <button type="button" id="searchBtn" class="btn-search">搜索</button>
+                    <input type="text" id="searchInput" placeholder="Search for attractions, restaurants, hotels..." />
+                    <button type="button" id="searchBtn" class="btn-search">Search</button>
                 </div>
                 <div id="searchResults" class="search-results" style="display: none;"></div>
             </div>
@@ -27,36 +27,55 @@
             <div class="form-container">
                 <form id="travelForm">
                     <div class="form-group">
-                        <label for="days">旅游天数 *</label>
-                        <input type="number" id="days" name="days" min="1" max="30" required placeholder="例如：3">
+                        <label for="days">Travel Days *</label>
+                        <input type="number" id="days" name="days" min="1" max="30" required placeholder="e.g., 3" title="Please enter the number of travel days">
                     </div>
 
                     <div class="form-group">
-                        <label for="destination">目的地 *</label>
-                        <input type="text" id="destination" name="destination" required placeholder="例如：北京、上海、日本东京">
+                        <label for="destination">Destination *</label>
+                        <input type="text" id="destination" name="destination" required placeholder="e.g., Tokyo, Paris, New York" title="Please enter your travel destination">
                     </div>
 
                     <div class="form-group">
-                        <label for="budget">预算（可选）</label>
-                        <input type="text" id="budget" name="budget" placeholder="例如：5000元、1000美元">
+                        <label for="budget">Budget (Optional)</label>
+                        <div class="budget-input-group">
+                            <input type="number" id="budget" name="budget" min="0" step="0.01" placeholder="Enter amount">
+                            <select id="currency" name="currency" class="currency-select">
+                                <option value="">Select Currency</option>
+                                <option value="USD">USD - US Dollar</option>
+                                <option value="CNY">CNY - Chinese Yuan</option>
+                                <option value="HKD">HKD - Hong Kong Dollar</option>
+                                <option value="EUR">EUR - Euro</option>
+                                <option value="GBP">GBP - British Pound</option>
+                                <option value="JPY">JPY - Japanese Yen</option>
+                                <option value="KRW">KRW - South Korean Won</option>
+                                <option value="SGD">SGD - Singapore Dollar</option>
+                                <option value="THB">THB - Thai Baht</option>
+                                <option value="AUD">AUD - Australian Dollar</option>
+                                <option value="CAD">CAD - Canadian Dollar</option>
+                                <option value="NZD">NZD - New Zealand Dollar</option>
+                                <option value="CHF">CHF - Swiss Franc</option>
+                            </select>
+                        </div>
+                        <small class="budget-hint">If you enter an amount, currency selection is required</small>
                     </div>
 
                     <div class="form-group">
-                        <label for="preferences">兴趣偏好（可选）</label>
-                        <textarea id="preferences" name="preferences" rows="3" placeholder="例如：喜欢历史文化、美食、自然风光、购物等"></textarea>
+                        <label for="preferences">Preferences (Optional)</label>
+                        <textarea id="preferences" name="preferences" rows="3" placeholder="e.g., history, culture, food, nature, shopping"></textarea>
                     </div>
 
                     <button type="submit" id="generateBtn" class="btn-primary">
-                        <span class="btn-text">生成旅游计划</span>
-                        <span class="btn-loader" style="display: none;">正在搜索和提取网页内容，请稍候...</span>
+                        <span class="btn-text">Generate Travel Plan</span>
+                        <span class="btn-loader" style="display: none;">Generating your travel plan, please wait...</span>
                     </button>
                 </form>
             </div>
 
             <div id="resultContainer" class="result-container" style="display: none;">
                 <div class="result-header">
-                    <h2>您的旅游计划</h2>
-                    <button id="copyBtn" class="btn-secondary">复制计划</button>
+                    <h2>Your Travel Plan</h2>
+                    <button id="copyBtn" class="btn-secondary">Copy Plan</button>
                 </div>
                 <div id="planContent" class="plan-content"></div>
             </div>
@@ -65,15 +84,15 @@
                 <div class="error-message"></div>
             </div>
             
-            <!-- 调试信息显示区域 -->
+            <!-- Debug Information Display Area -->
             <div id="debugContainer" class="debug-container" style="display: none;">
-                <h3>调试信息</h3>
+                <h3>Debug Information</h3>
                 <div id="debugContent" class="debug-content"></div>
             </div>
         </main>
 
         <footer>
-            <p>使用 DeepSeek API 生成 | 请确保已配置 API 密钥</p>
+            <p>Powered by DeepSeek API | Please ensure API key is configured</p>
         </footer>
     </div>
 
